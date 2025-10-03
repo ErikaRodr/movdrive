@@ -83,21 +83,26 @@ def write_sheet_data(sheet_name, df_new):
 
 def get_data(sheet_name, filter_col=None, filter_value=None):
     """Busca dados de uma aba/sheet e retorna um DataFrame do Pandas, com filtro opcional."""
-    df = get_sheet_data(sheet_name)
+    df = get_sheet_data(sheet_name) # Chama a função que já traz o DataFrame com IDs limpos
     if df.empty:
         return df
     
     if filter_col and filter_value is not None:
         try:
-            # Garante a tipagem correta para o filtro
+            # 🚨 Otimização: A conversão do ID deve estar garantida em get_sheet_data
+            # Mas reforçamos o filtro para o valor a ser comparado.
+            
+            # Garante que o ID no DataFrame é inteiro para comparação
             if filter_col.startswith('id_'):
                  df[filter_col] = pd.to_numeric(df[filter_col], errors='coerce').fillna(0).astype(int)
-                 filter_value = int(filter_value) if filter_value else 0
+                 # Garante que o valor de filtro seja inteiro
+                 filter_value = int(filter_value) if pd.notna(filter_value) else 0
             
             df_filtered = df[df[filter_col] == filter_value]
             return df_filtered
         except:
-            return pd.DataFrame() # Retorna vazio se o filtro falhar
+            # Em caso de falha de filtro (por exemplo, coluna não existe), retorne um DF vazio.
+            return pd.DataFrame() 
     
     return df
 
@@ -379,6 +384,13 @@ def get_full_service_data(date_start=None, date_end=None):
     df_servicos['id_veiculo'] = pd.to_numeric(df_servicos['id_veiculo'], errors='coerce').fillna(0).astype(int)
     df_servicos['id_prestador'] = pd.to_numeric(df_servicos['id_prestador'], errors='coerce').fillna(0).astype(int)
     
+    # 🛑 ADIÇÃO CRÍTICA DE CONVERSÃO ROBUSTA 🛑
+    # Garante que números e floats vazios ou inválidos virem 0.
+    df_servicos['valor'] = pd.to_numeric(df_servicos['valor'], errors='coerce').fillna(0.0)
+    df_servicos['garantia_dias'] = pd.to_numeric(df_servicos['garantia_dias'], errors='coerce').fillna(0).astype(int)
+    df_servicos['km_realizado'] = pd.to_numeric(df_servicos['km_realizado'], errors='coerce').fillna(0).astype(int)
+    df_servicos['km_proxima_revisao'] = pd.to_numeric(df_servicos['km_proxima_revisao'], errors='coerce').fillna(0).astype(int)
+    # -----------------------------------------------
     # 1. JOIN com Veículo
     df_merged = pd.merge(df_servicos, df_veiculos[['id_veiculo', 'nome', 'placa']], on='id_veiculo', how='left')
     
