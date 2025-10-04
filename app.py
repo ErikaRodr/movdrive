@@ -379,7 +379,7 @@ def get_full_service_data(date_start=None, date_end=None):
     df_servicos['id_veiculo'] = pd.to_numeric(df_servicos['id_veiculo'], errors='coerce').fillna(0).astype(int)
     df_servicos['id_prestador'] = pd.to_numeric(df_servicos['id_prestador'], errors='coerce').fillna(0).astype(int)
     
-    # 🛑 CONVERSÃO ROBUSTA 🛑
+    # 🛑 CONVERSÃO ROBUSTA DE TIPOS NUMÉRICOS 🛑
     # Garante que números e floats vazios ou inválidos virem 0.
     df_servicos['valor'] = pd.to_numeric(df_servicos['valor'], errors='coerce').fillna(0.0)
     df_servicos['garantia_dias'] = pd.to_numeric(df_servicos['garantia_dias'], errors='coerce').fillna(0).astype(int)
@@ -1004,12 +1004,13 @@ def main():
         if not df_historico.empty:
             st.write("### Tabela Detalhada de Serviços")
             
-            # 🛑 CORREÇÃO FINAL: Tratar NaT antes do .dt.date
+            # 🛑 CORREÇÃO FINAL DE TIPO 🛑
             # 1. FORÇA a conversão para datetime (útil se o cache retornou 'object' por engano).
             df_historico['data_vencimento'] = pd.to_datetime(df_historico['data_vencimento'], errors='coerce')
             df_historico['Data'] = pd.to_datetime(df_historico['Data'], errors='coerce') 
             
             # 2. Trata NaT: Substitui quaisquer valores inválidos/vazios (NaT) pela data de hoje.
+            # Isso garante que .dt.date possa ser chamado
             df_historico['data_vencimento'] = df_historico['data_vencimento'].fillna(pd.Timestamp(date.today()))
             df_historico['Data'] = df_historico['Data'].fillna(pd.Timestamp(date.today()))
             
