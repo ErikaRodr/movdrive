@@ -24,6 +24,7 @@ def get_gspread_client():
         st.error("⚠️ Credenciais do Google Sheets não encontradas. Certifique-se de que o 'gcp_service_account' está configurado em .streamlit/secrets.toml.")
         st.stop()
     except Exception as e:
+        # Este erro agora é mais específico para problemas na chave (Base64/Padding)
         st.error(f"Erro de autenticação Gspread. Verifique seu ID da planilha e o compartilhamento com a Service Account: {e}")
         st.stop()
 
@@ -89,9 +90,6 @@ def get_data(sheet_name, filter_col=None, filter_value=None):
     
     if filter_col and filter_value is not None:
         try:
-            # 🚨 Otimização: A conversão do ID deve estar garantida em get_sheet_data
-            # Mas reforçamos o filtro para o valor a ser comparado.
-            
             # Garante que o ID no DataFrame é inteiro para comparação
             if filter_col.startswith('id_'):
                  df[filter_col] = pd.to_numeric(df[filter_col], errors='coerce').fillna(0).astype(int)
@@ -170,8 +168,8 @@ def execute_crud_operation(sheet_name, data=None, id_col=None, id_value=None, op
 
 # --- Funções de Inserção/Atualização/Exclusão (CRUD) ---
 # Veículo
-def insert_vehicle(nome, placa, renavam, ano, valor_pago, data_compra):
-    renavam_value = renavam if renavam else None
+# 🛑 REMOÇÃO 1: Remover 'renavam' dos argumentos
+def insert_vehicle(nome, placa, ano, valor_pago, data_compra):
     
     # Checa se a placa já existe
     df_check = get_data('veiculo', 'placa', placa)
@@ -181,7 +179,8 @@ def insert_vehicle(nome, placa, renavam, ano, valor_pago, data_compra):
         
     data = {
         'id_veiculo': 0, 
-        'nome': nome, 'placa': placa, 'renavam': renavam_value, 
+        # 🛑 REMOÇÃO 2: Remover 'renavam' do dicionário de dados
+        'nome': nome, 'placa': placa, 
         'ano': ano, 'valor_pago': float(valor_pago), 'data_compra': str(data_compra)
     }
     
@@ -194,8 +193,8 @@ def insert_vehicle(nome, placa, renavam, ano, valor_pago, data_compra):
     else:
         st.error("Falha ao cadastrar veículo.")
 
-def update_vehicle(id_veiculo, nome, placa, renavam, ano, valor_pago, data_compra):
-    renavam_value = renavam if renavam else None
+# 🛑 REMOÇÃO 3: Remover 'renavam' dos argumentos
+def update_vehicle(id_veiculo, nome, placa, ano, valor_pago, data_compra):
     
     # Checa se a placa existe em outro ID
     df_check = get_data('veiculo', 'placa', placa)
@@ -207,7 +206,8 @@ def update_vehicle(id_veiculo, nome, placa, renavam, ano, valor_pago, data_compr
             return False
 
     data = {
-        'nome': nome, 'placa': placa, 'renavam': renavam_value, 
+        # 🛑 REMOÇÃO 4: Remover 'renavam' do dicionário de dados
+        'nome': nome, 'placa': placa, 
         'ano': ano, 'valor_pago': float(valor_pago), 'data_compra': str(data_compra)
     }
     
@@ -384,7 +384,7 @@ def get_full_service_data(date_start=None, date_end=None):
     df_servicos['id_veiculo'] = pd.to_numeric(df_servicos['id_veiculo'], errors='coerce').fillna(0).astype(int)
     df_servicos['id_prestador'] = pd.to_numeric(df_servicos['id_prestador'], errors='coerce').fillna(0).astype(int)
     
-    # 🛑 ADIÇÃO CRÍTICA DE CONVERSÃO ROBUSTA 🛑
+    # 🛑 CONVERSÃO ROBUSTA 🛑
     # Garante que números e floats vazios ou inválidos virem 0.
     df_servicos['valor'] = pd.to_numeric(df_servicos['valor'], errors='coerce').fillna(0.0)
     df_servicos['garantia_dias'] = pd.to_numeric(df_servicos['garantia_dias'], errors='coerce').fillna(0).astype(int)
@@ -412,7 +412,6 @@ def get_full_service_data(date_start=None, date_end=None):
 
 # ==============================================================================
 # 🚨 CSS PERSONALIZADO PARA FORÇAR BOTÕES LADO A LADO NO CELULAR 🚨
-# (INALTERADO)
 # ==============================================================================
 CUSTOM_CSS = """
 /* Aplica display flex (alinhamento horizontal) e nowrap (não quebrar linha) 
@@ -440,7 +439,7 @@ CUSTOM_CSS = """
 # ==============================================================================
 
 
-# --- COMPONENTES DE DISPLAY (Inalterados, usam as novas funções de CRUD) ---
+# --- COMPONENTES DE DISPLAY ---
 
 def display_vehicle_table_and_actions(df_veiculos_listagem):
     """Exibe a tabela de veículos com layout adaptado para celular."""
@@ -593,7 +592,7 @@ def manage_vehicle_form():
             st.header("➕ Novo Veículo")
             submit_label = 'Cadastrar Veículo'
             data = {
-                'nome': '', 'placa': '', 'renavam': '', 'ano': date.today().year, 
+                'nome': '', 'placa': '', 'ano': date.today().year, 
                 'valor_pago': 0.0, 'data_compra': date.today()
             }
             if st.button("Cancelar Cadastro / Voltar para Lista"):
@@ -629,33 +628,43 @@ def manage_vehicle_form():
             col1, col2 = st.columns(2)
             with col1:
                 placa = st.text_input("Placa", value=data['placa'], max_chars=10)
-            with col2:
-                renavam = st.text_input("Renavam", value=data['renavam'] or "", max_chars=11)
-                
-            st.caption("Detalhes de Aquisição")
-            col3, col4, col5 = st.columns(3)
+            # 🛑 REMOÇÃO 5: Removida a entrada de Renavam
+            # with col2:
+            #     renavam = st.text_input("Renavam", value=data['renavam'] or "", max_chars=11)
+            
+            # Ajustando colunas para 2, já que Renavam saiu
+            col3, col4 = st.columns(2)
             with col3:
+                st.caption("Detalhes de Aquisição")
                 current_year = date.today().year
                 # Converte o ano para int, tratando possíveis erros
                 default_ano = int(data['ano']) if pd.notna(data.get('ano')) and str(data['ano']).isdigit() else current_year
                 ano = st.number_input("Ano do Veículo", min_value=1900, max_value=current_year + 1, value=default_ano, step=1)
             with col4:
+                st.caption(" ") # Espaço para alinhar com o título acima
                 # Converte o valor para float, tratando possíveis erros
                 default_valor = float(data['valor_pago']) if pd.notna(data.get('valor_pago')) else 0.0
                 valor_pago = st.number_input("Valor Pago (R$)", min_value=0.0, format="%.2f", value=default_valor, step=1000.0)
+            
+            col5, col6 = st.columns(2)
             with col5:
                 # data_compra já está como date
                 data_compra = st.date_input("Data de Compra", value=data['data_compra'])
-                
+            
+            # O Renavam foi removido, então ele não é passado aqui
+            renavam_dummy = None
+
             submit_button = st.form_submit_button(label=submit_label)
 
             if submit_button:
                 if not vehicle_name or not placa:
                     st.warning("O Nome e a Placa são campos obrigatórios.")
                 elif is_new_mode:
-                    insert_vehicle(vehicle_name, placa, renavam, ano, valor_pago, data_compra)
+                    # 🛑 REMOÇÃO 6: Não passar 'renavam_dummy'
+                    insert_vehicle(vehicle_name, placa, ano, valor_pago, data_compra)
                 else:
-                    update_vehicle(vehicle_id_to_edit, vehicle_name, placa, renavam, ano, valor_pago, data_compra)
+                    # 🛑 REMOÇÃO 7: Não passar 'renavam_dummy'
+                    update_vehicle(vehicle_id_to_edit, vehicle_name, placa, ano, valor_pago, data_compra)
         
         return
 
@@ -977,12 +986,11 @@ def main():
 
         if not df_merged.empty:
             # Usa o DataFrame completo para o resumo
-            df_resumo_raw = df_merged[['Veículo', 'Valor']]
+            df_resumo_raw = df_merged[['Veículo', 'Valor']].copy()
             
-            # Converte para numérico
-            df_resumo_raw['Valor Num'] = pd.to_numeric(df_resumo_raw['Valor'], errors='coerce').fillna(0).astype(float)
+            # Não precisa converter novamente, o Valor já é float do get_full_service_data
             
-            resumo = df_resumo_raw.groupby('Veículo')['Valor Num'].sum().sort_values(ascending=False).reset_index()
+            resumo = df_resumo_raw.groupby('Veículo')['Valor'].sum().sort_values(ascending=False).reset_index()
             resumo.columns = ['Veículo', 'Total Gasto em Serviços']
             
             # Formata para R$
@@ -1005,13 +1013,21 @@ def main():
         if not df_historico.empty:
             st.write("### Tabela Detalhada de Serviços")
             
+            # 🛑 CORREÇÃO FINAL: Tratar NaT antes do .dt.date
+            # Garante que data_vencimento seja datetime, substituindo NaT (falhas de conversão) pela data de hoje.
+            df_historico['data_vencimento'] = df_historico['data_vencimento'].fillna(pd.Timestamp(date.today()))
+
             # Cálculo manual de 'Dias para Vencer'
             df_historico['Dias para Vencer'] = (df_historico['data_vencimento'].dt.date - date.today()).dt.days
             
             # Formatação de colunas
+            # A coluna 'Data' também deve ser tratada contra NaT para ser usada no strftime
+            df_historico['Data'] = df_historico['Data'].fillna(pd.Timestamp(date.today())) 
             df_historico['Data Serviço'] = df_historico['Data'].dt.strftime('%d-%m-%Y')
             df_historico['Data Vencimento'] = df_historico['data_vencimento'].dt.strftime('%d-%m-%Y')
-            df_historico['Valor'] = pd.to_numeric(df_historico['Valor'], errors='coerce').fillna(0).apply(lambda x: f'R$ {x:,.2f}'.replace('.', 'X').replace(',', '.').replace('X', ','))
+            
+            # O valor já é float, basta formatar.
+            df_historico['Valor'] = df_historico['Valor'].apply(lambda x: f'R$ {x:,.2f}'.replace('.', 'X').replace(',', '.').replace('X', ','))
             
             # Seleção final das colunas
             df_historico_display = df_historico[[
