@@ -1004,45 +1004,51 @@ def main():
     # ----------------------------------------------------
     # 2. DASHBOARD: HISTÓRICO DETALHADO
     # ----------------------------------------------------
-    with tab_historico:
-        st.header("Histórico Completo de Serviços")
+
+with tab_historico:
+    st.header("Histórico Completo de Serviços")
+    
+    df_historico = get_full_service_data()
+
+    if not df_historico.empty:
+        st.write("### Tabela Detalhada de Serviços")
         
-        # ALTERAÇÃO: Usa a função de JOIN para obter os dados
-        df_historico = get_full_service_data()
+        # 🛑 CORREÇÃO DEFINITIVA DE TIPO 🛑
+        # 1. FORÇA a conversão para datetime (útil se o cache retornou 'object' por engano).
+        #    Isso garante que .dt possa ser chamado.
+        df_historico['data_vencimento'] = pd.to_datetime(df_historico['data_vencimento'], errors='coerce')
+        
+        # 2. Trata NaT: Substitui quaisquer valores inválidos/vazios (NaT) pela data atual (Timestamp).
+        df_historico['data_vencimento'] = df_historico['data_vencimento'].fillna(pd.Timestamp(date.today()))
+        
+        # O mesmo para 'Data'
+        df_historico['Data'] = pd.to_datetime(df_historico['Data'], errors='coerce').fillna(pd.Timestamp(date.today()))
+        
+        # FIM DA CORREÇÃO DE TIPO
+        # -------------------------------------------------------------------------------------
 
-        if not df_historico.empty:
-            st.write("### Tabela Detalhada de Serviços")
-            
-            # 🛑 CORREÇÃO FINAL: Tratar NaT antes do .dt.date
-            # Garante que data_vencimento seja datetime, substituindo NaT (falhas de conversão) pela data de hoje.
-            df_historico['data_vencimento'] = df_historico['data_vencimento'].fillna(pd.Timestamp(date.today()))
-
-            # Cálculo manual de 'Dias para Vencer'
-            df_historico['Dias para Vencer'] = (df_historico['data_vencimento'].dt.date - date.today()).dt.days
-            
-            # Formatação de colunas
-            # A coluna 'Data' também deve ser tratada contra NaT para ser usada no strftime
-            df_historico['Data'] = df_historico['Data'].fillna(pd.Timestamp(date.today())) 
-            df_historico['Data Serviço'] = df_historico['Data'].dt.strftime('%d-%m-%Y')
-            df_historico['Data Vencimento'] = df_historico['data_vencimento'].dt.strftime('%d-%m-%Y')
-            
-            # O valor já é float, basta formatar.
-            df_historico['Valor'] = df_historico['Valor'].apply(lambda x: f'R$ {x:,.2f}'.replace('.', 'X').replace(',', '.').replace('X', ','))
-            
-            # Seleção final das colunas
-            df_historico_display = df_historico[[
-                'Veículo', 'Serviço', 'Empresa', 'Data Serviço', 'Data Vencimento', 
-                'Dias para Vencer', 'Cidade', 'Valor', 'km_realizado', 'km_proxima_revisao'
-            ]].rename(columns={
-                'km_realizado': 'KM Realizado', 'km_proxima_revisao': 'KM Próxima Revisão'
-            })
-            
-            st.dataframe(df_historico_display, width='stretch', hide_index=True)
-            
-        else:
-            st.info("Nenhum serviço encontrado. Por favor, cadastre um serviço na aba 'Cadastro'.")
-
-
+        # Cálculo manual de 'Dias para Vencer' (AGORA SEGURO)
+        df_historico['Dias para Vencer'] = (df_historico['data_vencimento'].dt.date - date.today()).dt.days
+        
+        # Formatação de colunas
+        df_historico['Data Serviço'] = df_historico['Data'].dt.strftime('%d-%m-%Y')
+        df_historico['Data Vencimento'] = df_historico['data_vencimento'].dt.strftime('%d-%m-%Y')
+        
+        # O valor já é float, basta formatar.
+        df_historico['Valor'] = df_historico['Valor'].apply(lambda x: f'R$ {x:,.2f}'.replace('.', 'X').replace(',', '.').replace('X', ','))
+        
+        # Seleção final das colunas
+        df_historico_display = df_historico[[
+            'Veículo', 'Serviço', 'Empresa', 'Data Serviço', 'Data Vencimento', 
+            'Dias para Vencer', 'Cidade', 'Valor', 'km_realizado', 'km_proxima_revisao'
+        ]].rename(columns={
+            'km_realizado': 'KM Realizado', 'km_proxima_revisao': 'KM Próxima Revisão'
+        })
+        
+        st.dataframe(df_historico_display, width='stretch', hide_index=True)
+        
+    else:
+        st.info("Nenhum serviço encontrado. Por favor, cadastre um serviço na aba 'Cadastro'.")
     # ----------------------------------------------------
     # 3. CADASTRO / MANUTENÇÃO UNIFICADA
     # ----------------------------------------------------
