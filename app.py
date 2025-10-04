@@ -400,7 +400,7 @@ def get_full_service_data(date_start=None, date_end=None):
     df_servicos['id_veiculo'] = pd.to_numeric(df_servicos['id_veiculo'], errors='coerce').fillna(0).astype(int)
     df_servicos['id_prestador'] = pd.to_numeric(df_servicos['id_prestador'], errors='coerce').fillna(0).astype(int)
     
-    # 🛑 CONVERSÃO FINAL DE TIPOS NUMÉRICOS (Já foi feita em get_sheet_data, mas reforçada aqui para segurança) 🛑
+    # 🛑 CONVERSÃO FINAL DE TIPOS NUMÉRICOS 🛑
     df_servicos['valor'] = pd.to_numeric(df_servicos['valor'], errors='coerce').fillna(0.0)
     df_servicos['garantia_dias'] = pd.to_numeric(df_servicos['garantia_dias'], errors='coerce').fillna(0).astype(int)
     df_servicos['km_realizado'] = pd.to_numeric(df_servicos['km_realizado'], errors='coerce').fillna(0).astype(int)
@@ -415,7 +415,7 @@ def get_full_service_data(date_start=None, date_end=None):
     # Renomeia colunas para o display
     df_merged = df_merged.rename(columns={'nome': 'Veículo', 'placa': 'Placa', 'empresa': 'Empresa', 'cidade': 'Cidade', 'nome_servico': 'Serviço', 'data_servico': 'Data', 'valor': 'Valor'})
     
-    # Converte colunas de data (sem NaT) - Já foi feita em get_sheet_data, mas é mantida por segurança
+    # Converte colunas de data (sem NaT) - já foram feitas em get_sheet_data
     df_merged['Data'] = pd.to_datetime(df_merged['Data'], errors='coerce')
     df_merged['data_vencimento'] = pd.to_datetime(df_merged['data_vencimento'], errors='coerce')
 
@@ -1025,11 +1025,10 @@ def main():
             st.write("### Tabela Detalhada de Serviços")
             
             # 🛑 CORREÇÃO FINAL DE TIPO 🛑
-            # As conversões já estão em get_sheet_data, mas aplicamos .fillna() aqui para garantir que não haja NaT ao usar .dt
-            
-            # 1. Trata NaT: Substitui quaisquer valores inválidos/vazios (NaT) pela data de hoje.
-            df_historico['data_vencimento'] = df_historico['data_vencimento'].fillna(pd.Timestamp(date.today()))
-            df_historico['Data'] = df_historico['Data'].fillna(pd.Timestamp(date.today()))
+            # 1. Força a conversão e trata NaT em ambas as colunas de data.
+            #    Isso resolve o erro persistente do .dt accessor.
+            df_historico['data_vencimento'] = pd.to_datetime(df_historico['data_vencimento'], errors='coerce').fillna(pd.Timestamp(date.today()))
+            df_historico['Data'] = pd.to_datetime(df_historico['Data'], errors='coerce').fillna(pd.Timestamp(date.today()))
             
             # FIM DA CORREÇÃO DE TIPO
             # -------------------------------------------------------------------------------------
