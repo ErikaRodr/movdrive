@@ -29,7 +29,7 @@ def get_gspread_client():
 
 @st.cache_data(ttl=5) # Cache para leitura rápida (revalida a cada 5 segundos)
 def get_sheet_data(sheet_name):
-    """Lê os dados de uma aba/sheet e retorna um DataFrame."""
+    """Lê os dados de uma aba/sheet e retorna um DataFrame, com conversões iniciais."""
     try:
         gc = get_gspread_client()
         sh = gc.open_by_key(SHEET_ID)
@@ -39,10 +39,31 @@ def get_sheet_data(sheet_name):
         data = worksheet.get_all_records()
         df = pd.DataFrame(data)
 
+        if df.empty:
+            return df
+            
         # Garante que as colunas de ID sejam tratadas como inteiros
         id_col = f'id_{sheet_name}' if sheet_name in ('veiculo', 'prestador') else 'id_servico'
-        if not df.empty and id_col in df.columns:
+        if id_col in df.columns:
             df[id_col] = pd.to_numeric(df[id_col], errors='coerce').fillna(0).astype(int)
+        
+        # 🚀 ESTABILIZAÇÃO: CONVERSÃO INICIAL DE TIPOS CHAVE LOGO APÓS A LEITURA
+        if sheet_name == 'veiculo':
+            # Conversão para float e data no df_veiculo
+            if 'valor_pago' in df.columns:
+                 df['valor_pago'] = pd.to_numeric(df['valor_pago'], errors='coerce').fillna(0.0).astype(float)
+            if 'data_compra' in df.columns:
+                 df['data_compra'] = pd.to_datetime(df['data_compra'], errors='coerce')
+
+        if sheet_name == 'servico':
+             # Conversão para tipos numéricos de serviço
+             for col in ['valor', 'garantia_dias', 'km_realizado', 'km_proxima_revisao']:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+             # Conversão para data de serviço
+             for col in ['data_servico', 'data_vencimento']:
+                 if col in df.columns:
+                     df[col] = pd.to_datetime(df[col], errors='coerce')
         
         return df
 
@@ -379,8 +400,7 @@ def get_full_service_data(date_start=None, date_end=None):
     df_servicos['id_veiculo'] = pd.to_numeric(df_servicos['id_veiculo'], errors='coerce').fillna(0).astype(int)
     df_servicos['id_prestador'] = pd.to_numeric(df_servicos['id_prestador'], errors='coerce').fillna(0).astype(int)
     
-    # 🛑 CONVERSÃO ROBUSTA DE TIPOS NUMÉRICOS 🛑
-    # Garante que números e floats vazios ou inválidos virem 0.
+    # 🛑 CONVERSÃO FINAL DE TIPOS NUMÉRICOS (Já foi feita em get_sheet_data, mas reforçada aqui para segurança) 🛑
     df_servicos['valor'] = pd.to_numeric(df_servicos['valor'], errors='coerce').fillna(0.0)
     df_servicos['garantia_dias'] = pd.to_numeric(df_servicos['garantia_dias'], errors='coerce').fillna(0).astype(int)
     df_servicos['km_realizado'] = pd.to_numeric(df_servicos['km_realizado'], errors='coerce').fillna(0).astype(int)
@@ -395,7 +415,7 @@ def get_full_service_data(date_start=None, date_end=None):
     # Renomeia colunas para o display
     df_merged = df_merged.rename(columns={'nome': 'Veículo', 'placa': 'Placa', 'empresa': 'Empresa', 'cidade': 'Cidade', 'nome_servico': 'Serviço', 'data_servico': 'Data', 'valor': 'Valor'})
     
-    # Converte colunas de data (sem NaT)
+    # Converte colunas de data (sem NaT) - Já foi feita em get_sheet_data, mas é mantida por segurança
     df_merged['Data'] = pd.to_datetime(df_merged['Data'], errors='coerce')
     df_merged['data_vencimento'] = pd.to_datetime(df_merged['data_vencimento'], errors='coerce')
 
@@ -1005,12 +1025,9 @@ def main():
             st.write("### Tabela Detalhada de Serviços")
             
             # 🛑 CORREÇÃO FINAL DE TIPO 🛑
-            # 1. FORÇA a conversão para datetime (útil se o cache retornou 'object' por engano).
-            df_historico['data_vencimento'] = pd.to_datetime(df_historico['data_vencimento'], errors='coerce')
-            df_historico['Data'] = pd.to_datetime(df_historico['Data'], errors='coerce') 
+            # As conversões já estão em get_sheet_data, mas aplicamos .fillna() aqui para garantir que não haja NaT ao usar .dt
             
-            # 2. Trata NaT: Substitui quaisquer valores inválidos/vazios (NaT) pela data de hoje.
-            # Isso garante que .dt.date possa ser chamado
+            # 1. Trata NaT: Substitui quaisquer valores inválidos/vazios (NaT) pela data de hoje.
             df_historico['data_vencimento'] = df_historico['data_vencimento'].fillna(pd.Timestamp(date.today()))
             df_historico['Data'] = df_historico['Data'].fillna(pd.Timestamp(date.today()))
             
