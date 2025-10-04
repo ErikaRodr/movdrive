@@ -13,7 +13,7 @@ SHEET_ID = '1BNjgWhvEj8NbnGr4x7F42LW7QbQiG5kZ1FBhfr9Q-4g' # <--- SUBSTITUA PELO 
 
 @st.cache_resource(ttl=3600) # Cache para a conexão não abrir a cada execução
 def get_gspread_client():
-    """Retorna o cliente Gspread autenticado."""
+"""Retorna o cliente Gspread autenticado."""
     try:
         # Tenta carregar as credenciais do Streamlit Secrets
         creds_info = st.secrets["gcp_service_account"]
@@ -1078,4 +1078,5 @@ def main():
             manage_service_form()
 
 if __name__ == '__main__':
+
     main()
