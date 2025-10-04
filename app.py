@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
-# import mysql.connector # REMOVIDO
 from datetime import date, timedelta
 import time
-import gspread # NOVA BIBLIOTECA PARA GOOGLE SHEETS
+import gspread # Biblioteca para Google Sheets
 
 # ==============================================================================
 # 🚨 CONFIGURAÇÃO GOOGLE SHEETS E CONEXÃO 🚨
@@ -84,7 +83,7 @@ def write_sheet_data(sheet_name, df_new):
 
 def get_data(sheet_name, filter_col=None, filter_value=None):
     """Busca dados de uma aba/sheet e retorna um DataFrame do Pandas, com filtro opcional."""
-    df = get_sheet_data(sheet_name) # Chama a função que já traz o DataFrame com IDs limpos
+    df = get_sheet_data(sheet_name) 
     if df.empty:
         return df
     
@@ -168,7 +167,6 @@ def execute_crud_operation(sheet_name, data=None, id_col=None, id_value=None, op
 
 # --- Funções de Inserção/Atualização/Exclusão (CRUD) ---
 # Veículo
-# 🛑 REMOÇÃO 1: Remover 'renavam' dos argumentos
 def insert_vehicle(nome, placa, ano, valor_pago, data_compra):
     
     # Checa se a placa já existe
@@ -179,7 +177,6 @@ def insert_vehicle(nome, placa, ano, valor_pago, data_compra):
         
     data = {
         'id_veiculo': 0, 
-        # 🛑 REMOÇÃO 2: Remover 'renavam' do dicionário de dados
         'nome': nome, 'placa': placa, 
         'ano': ano, 'valor_pago': float(valor_pago), 'data_compra': str(data_compra)
     }
@@ -193,7 +190,6 @@ def insert_vehicle(nome, placa, ano, valor_pago, data_compra):
     else:
         st.error("Falha ao cadastrar veículo.")
 
-# 🛑 REMOÇÃO 3: Remover 'renavam' dos argumentos
 def update_vehicle(id_veiculo, nome, placa, ano, valor_pago, data_compra):
     
     # Checa se a placa existe em outro ID
@@ -206,7 +202,6 @@ def update_vehicle(id_veiculo, nome, placa, ano, valor_pago, data_compra):
             return False
 
     data = {
-        # 🛑 REMOÇÃO 4: Remover 'renavam' do dicionário de dados
         'nome': nome, 'placa': placa, 
         'ano': ano, 'valor_pago': float(valor_pago), 'data_compra': str(data_compra)
     }
@@ -400,7 +395,7 @@ def get_full_service_data(date_start=None, date_end=None):
     # Renomeia colunas para o display
     df_merged = df_merged.rename(columns={'nome': 'Veículo', 'placa': 'Placa', 'empresa': 'Empresa', 'cidade': 'Cidade', 'nome_servico': 'Serviço', 'data_servico': 'Data', 'valor': 'Valor'})
     
-    # Converte colunas de data
+    # Converte colunas de data (sem NaT)
     df_merged['Data'] = pd.to_datetime(df_merged['Data'], errors='coerce')
     df_merged['data_vencimento'] = pd.to_datetime(df_merged['data_vencimento'], errors='coerce')
 
@@ -628,9 +623,6 @@ def manage_vehicle_form():
             col1, col2 = st.columns(2)
             with col1:
                 placa = st.text_input("Placa", value=data['placa'], max_chars=10)
-            # 🛑 REMOÇÃO 5: Removida a entrada de Renavam
-            # with col2:
-            #     renavam = st.text_input("Renavam", value=data['renavam'] or "", max_chars=11)
             
             # Ajustando colunas para 2, já que Renavam saiu
             col3, col4 = st.columns(2)
@@ -1004,51 +996,49 @@ def main():
     # ----------------------------------------------------
     # 2. DASHBOARD: HISTÓRICO DETALHADO
     # ----------------------------------------------------
+    with tab_historico:
+        st.header("Histórico Completo de Serviços")
+        
+        df_historico = get_full_service_data()
 
-with tab_historico:
-    st.header("Histórico Completo de Serviços")
-    
-    df_historico = get_full_service_data()
+        if not df_historico.empty:
+            st.write("### Tabela Detalhada de Serviços")
+            
+            # 🛑 CORREÇÃO FINAL: Tratar NaT antes do .dt.date
+            # 1. FORÇA a conversão para datetime (útil se o cache retornou 'object' por engano).
+            df_historico['data_vencimento'] = pd.to_datetime(df_historico['data_vencimento'], errors='coerce')
+            df_historico['Data'] = pd.to_datetime(df_historico['Data'], errors='coerce') 
+            
+            # 2. Trata NaT: Substitui quaisquer valores inválidos/vazios (NaT) pela data de hoje.
+            df_historico['data_vencimento'] = df_historico['data_vencimento'].fillna(pd.Timestamp(date.today()))
+            df_historico['Data'] = df_historico['Data'].fillna(pd.Timestamp(date.today()))
+            
+            # FIM DA CORREÇÃO DE TIPO
+            # -------------------------------------------------------------------------------------
 
-    if not df_historico.empty:
-        st.write("### Tabela Detalhada de Serviços")
-        
-        # 🛑 CORREÇÃO DEFINITIVA DE TIPO 🛑
-        # 1. FORÇA a conversão para datetime (útil se o cache retornou 'object' por engano).
-        #    Isso garante que .dt possa ser chamado.
-        df_historico['data_vencimento'] = pd.to_datetime(df_historico['data_vencimento'], errors='coerce')
-        
-        # 2. Trata NaT: Substitui quaisquer valores inválidos/vazios (NaT) pela data atual (Timestamp).
-        df_historico['data_vencimento'] = df_historico['data_vencimento'].fillna(pd.Timestamp(date.today()))
-        
-        # O mesmo para 'Data'
-        df_historico['Data'] = pd.to_datetime(df_historico['Data'], errors='coerce').fillna(pd.Timestamp(date.today()))
-        
-        # FIM DA CORREÇÃO DE TIPO
-        # -------------------------------------------------------------------------------------
+            # Cálculo manual de 'Dias para Vencer' (AGORA SEGURO)
+            df_historico['Dias para Vencer'] = (df_historico['data_vencimento'].dt.date - date.today()).dt.days
+            
+            # Formatação de colunas
+            df_historico['Data Serviço'] = df_historico['Data'].dt.strftime('%d-%m-%Y')
+            df_historico['Data Vencimento'] = df_historico['data_vencimento'].dt.strftime('%d-%m-%Y')
+            
+            # O valor já é float, basta formatar.
+            df_historico['Valor'] = df_historico['Valor'].apply(lambda x: f'R$ {x:,.2f}'.replace('.', 'X').replace(',', '.').replace('X', ','))
+            
+            # Seleção final das colunas
+            df_historico_display = df_historico[[
+                'Veículo', 'Serviço', 'Empresa', 'Data Serviço', 'Data Vencimento', 
+                'Dias para Vencer', 'Cidade', 'Valor', 'km_realizado', 'km_proxima_revisao'
+            ]].rename(columns={
+                'km_realizado': 'KM Realizado', 'km_proxima_revisao': 'KM Próxima Revisão'
+            })
+            
+            st.dataframe(df_historico_display, width='stretch', hide_index=True)
+            
+        else:
+            st.info("Nenhum serviço encontrado. Por favor, cadastre um serviço na aba 'Cadastro'.")
 
-        # Cálculo manual de 'Dias para Vencer' (AGORA SEGURO)
-        df_historico['Dias para Vencer'] = (df_historico['data_vencimento'].dt.date - date.today()).dt.days
-        
-        # Formatação de colunas
-        df_historico['Data Serviço'] = df_historico['Data'].dt.strftime('%d-%m-%Y')
-        df_historico['Data Vencimento'] = df_historico['data_vencimento'].dt.strftime('%d-%m-%Y')
-        
-        # O valor já é float, basta formatar.
-        df_historico['Valor'] = df_historico['Valor'].apply(lambda x: f'R$ {x:,.2f}'.replace('.', 'X').replace(',', '.').replace('X', ','))
-        
-        # Seleção final das colunas
-        df_historico_display = df_historico[[
-            'Veículo', 'Serviço', 'Empresa', 'Data Serviço', 'Data Vencimento', 
-            'Dias para Vencer', 'Cidade', 'Valor', 'km_realizado', 'km_proxima_revisao'
-        ]].rename(columns={
-            'km_realizado': 'KM Realizado', 'km_proxima_revisao': 'KM Próxima Revisão'
-        })
-        
-        st.dataframe(df_historico_display, width='stretch', hide_index=True)
-        
-    else:
-        st.info("Nenhum serviço encontrado. Por favor, cadastre um serviço na aba 'Cadastro'.")
     # ----------------------------------------------------
     # 3. CADASTRO / MANUTENÇÃO UNIFICADA
     # ----------------------------------------------------
